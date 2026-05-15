@@ -43,15 +43,17 @@ def check_balance():
     client = DescoClient()
     result = client.fetch_balance()
 
-    balance, meter_no, timestamp = result if result else (None, None, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     last_status = load_last_status()
-    
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     if not result:
         logger.error("Failed to fetch balance. Check logs and screenshots.")
         last_status["last_check_status"] = "failed"
         last_status["last_check_time"] = timestamp
         save_status(last_status)
         return
+
+    balance, meter_no, timestamp = result
 
     # Check thresholds
     triggered_threshold = None

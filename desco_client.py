@@ -46,8 +46,15 @@ class DescoClient:
                         page.fill("input[placeholder*='Meter'], input[name*='meter'], input[id*='meter']", self.meter_no)
                     
                     logger.info("Submitting inquiry...")
-                    # Click the most likely submit button (Search, Submit, Inquiry)
-                    page.click("button:has-text('Search'), button:has-text('Submit'), button:has-text('Inquiry'), button[type='submit']")
+                    # Try clicking multiple common search/submit patterns
+                    submit_button = page.locator("button:has-text('Search'), button:has-text('Submit'), button:has-text('Inquiry'), button[type='submit'], .btn-primary, .btn-search").first
+                    
+                    if submit_button.is_visible():
+                        submit_button.click()
+                    else:
+                        logger.warning("Submit button not found by text, trying to press Enter on input field...")
+                        # Fallback: Press Enter on the last filled input field
+                        page.keyboard.press("Enter")
                 else:
                     logger.info(f"Password provided. Navigating to main login: {self.MAIN_URL}")
                     page.goto(self.MAIN_URL, timeout=60000)
