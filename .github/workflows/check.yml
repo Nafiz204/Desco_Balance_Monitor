@@ -40,6 +40,11 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add logs/status.json
-          git commit -m "Update balance status [skip ci]" || echo "No changes to commit"
-          git push
+          # Check if the file exists and if there are changes
+          if [ -f logs/status.json ]; then
+            git add logs/status.json
+            git commit -m "Update balance status [skip ci]" || echo "No changes to commit"
+            git push
+          else
+            echo "Status file logs/status.json not found, skipping commit."
+          fi

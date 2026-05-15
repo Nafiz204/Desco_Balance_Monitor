@@ -28,23 +28,26 @@ class DescoClient:
             try:
                 # Prioritize the Customer Portal if no password is used
                 if not self.password:
-                    logger.info(f"Targeting customer portal: {self.CUSTOMER_PORTAL}")
+                    logger.info(f"Targeting customer portal for inquiry: {self.CUSTOMER_PORTAL}")
                     page.goto(self.CUSTOMER_PORTAL, timeout=60000)
                     
-                    # Wait for form elements (SPA might take a second)
-                    page.wait_for_selector("input[name='account_no'], input[id='account_no']", timeout=15000)
+                    # Wait for form (SPA might take a second)
+                    # We try to find any input that might be for Account No or Meter No
+                    page.wait_for_selector("input", timeout=15000)
                     
-                    # Fill Account Number
-                    page.fill("input[name='account_no'], input[id='account_no']", self.username)
+                    # If user provided username (Account No), use it
+                    if self.username:
+                        logger.info(f"Filling Account Number: {self.username}")
+                        page.fill("input[placeholder*='Account'], input[name*='account'], input[id*='account']", self.username)
                     
+                    # If user provided Meter Number specifically, or as a fallback
                     if self.meter_no:
-                        # Some forms might need meter number too
-                        meter_input = page.locator("input[name='meter_no'], input[id='meter_no']")
-                        if meter_input.is_visible():
-                            meter_input.fill(self.meter_no)
+                        logger.info(f"Filling Meter Number: {self.meter_no}")
+                        page.fill("input[placeholder*='Meter'], input[name*='meter'], input[id*='meter']", self.meter_no)
                     
-                    logger.info("Submitting inquiry on customer portal...")
-                    page.click("button:has-text('Submit'), button[type='submit'], input[type='submit']")
+                    logger.info("Submitting inquiry...")
+                    # Click the most likely submit button (Search, Submit, Inquiry)
+                    page.click("button:has-text('Search'), button:has-text('Submit'), button:has-text('Inquiry'), button[type='submit']")
                 else:
                     logger.info(f"Password provided. Navigating to main login: {self.MAIN_URL}")
                     page.goto(self.MAIN_URL, timeout=60000)
