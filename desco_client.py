@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 class DescoClient:
     # Use the public inquiry URL if possible, otherwise use the main portal
     MAIN_URL = "https://prepaid.desco.org.bd/"
-    INQUIRY_URL = "https://prepaid.desco.org.bd/index.php/customer/balance_inquiry"
+    CUSTOMER_PORTAL = "https://prepaid.desco.org.bd/customer/#/customer-info"
 
     def __init__(self):
         self.username = Config.DESCO_USER
@@ -16,7 +16,7 @@ class DescoClient:
 
     def fetch_balance(self):
         """
-        Fetches current balance using the inquiry page or login portal.
+        Fetches current balance using the customer info portal or login page.
         """
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -26,32 +26,39 @@ class DescoClient:
             page = context.new_page()
 
             try:
-                # If no password provided, use the Inquiry Page
+                # Prioritize the Customer Portal if no password is used
                 if not self.password:
-                    logger.info(f"No password provided. Navigating to inquiry page: {self.INQUIRY_URL}")
-                    page.goto(self.INQUIRY_URL, timeout=60000)
+                    logger.info(f"Targeting customer portal: {self.CUSTOMER_PORTAL}")
+                    page.goto(self.CUSTOMER_PORTAL, timeout=60000)
+                    
+                    # Wait for form elements (SPA might take a second)
+                    page.wait_for_selector("input[name='account_no'], input[id='account_no']", timeout=15000)
                     
                     # Fill Account Number
                     page.fill("input[name='account_no'], input[id='account_no']", self.username)
-                    # Often Meter Number is also required for inquiry
-                    if self.meter_no:
-                        page.fill("input[name='meter_no'], input[id='meter_no']", self.meter_no)
                     
-                    logger.info("Submitting inquiry...")
-                    page.click("button[type='submit'], input[type='submit']")
+                    if self.meter_no:
+                        # Some forms might need meter number too
+                        meter_input = page.locator("input[name='meter_no'], input[id='meter_no']")
+                        if meter_input.is_visible():
+                            meter_input.fill(self.meter_no)
+                    
+                    logger.info("Submitting inquiry on customer portal...")
+                    page.click("button:has-text('Submit'), button[type='submit'], input[type='submit']")
                 else:
-                    logger.info(f"Password provided. Navigating to portal: {self.MAIN_URL}")
+                    logger.info(f"Password provided. Navigating to main login: {self.MAIN_URL}")
                     page.goto(self.MAIN_URL, timeout=60000)
                     
-                    # Fill login details
                     page.fill("input[name='userid'], input[name='username'], input[id='userid']", self.username)
                     page.fill("input[name='password'], input[id='password']", self.password)
                     
                     logger.info("Attempting login...")
                     page.click("button[type='submit'], input[type='submit']")
                 
-                # Wait for results
+                # Wait for results - SPAs often take time to fetch data after button click
                 page.wait_for_load_state("networkidle")
+                # Wait a bit longer for the specific balance text to likely appear
+                page.wait_for_timeout(3000) 
                 
                 # Extract balance
                 # Usually balance is in a div or span with 'balance' in text or id
