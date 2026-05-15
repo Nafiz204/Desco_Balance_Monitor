@@ -1,0 +1,43 @@
+name: DESCO Balance Monitor
+
+on:
+  schedule:
+    # Run at 01:00 UTC (07:00 AM Bangladesh Time)
+    - cron: '0 1 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  check-balance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/checkout@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          playwright install chromium
+
+      - name: Run monitor
+        env:
+          DESCO_USER: ${{ secrets.DESCO_USER }}
+          DESCO_PASS: ${{ secrets.DESCO_PASS }}
+          METER_NUMBER: ${{ secrets.METER_NUMBER }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: python main.py
+
+      - name: Commit and push status
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add logs/status.json
+          git commit -m "Update balance status [skip ci]" || echo "No changes to commit"
+          git push

@@ -1,0 +1,8 @@
+{
+  "name": "DESCO Monitor",
+  "description": "Automated DESCO prepaid meter balance monitoring with low-balance email alerts via GitHub Actions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
