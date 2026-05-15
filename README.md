@@ -32,7 +32,13 @@ To enable the GitHub Action, go to your repository **Settings > Secrets and vari
   3. Create a new one for "Mail" and "Other (Custom Name)".
   4. Copy the **16-digit code** provided. This is your `EMAIL_PASS`. It allows the script to send emails bypasssing 2FA.
 
-### 3. Local Testing
+### 3. Recent Fixes
+- **Dynamic Waiting (SPA Support)**: Implemented a 20-second polling loop that waits for balance data to populate. This solves issues where the script would read data before the DESCO portal's frontend finished fetching from the backend.
+- **Improved Heuristics**: Better extraction logic that prioritizes non-zero values during page load to avoid capturing temporary placeholders.
+- **Decimal & Comma Support**: Full support for balances with commas (e.g., `1,250.00 BDT`).
+- **Debug Artifacts**: Screenshots and logs are now easier to trace via GitHub Actions artifacts.
+
+### 4. Local Testing
 1. Clone the repository.
 2. Install dependencies:
    ```bash

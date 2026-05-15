@@ -32,7 +32,6 @@ class DescoClient:
                     page.goto(self.CUSTOMER_PORTAL, timeout=60000)
                     
                     # Wait for form (SPA might take a second)
-                    # We try to find any input that might be for Account No or Meter No
                     page.wait_for_selector("input", timeout=15000)
                     
                     # If user provided username (Account No), use it
@@ -46,68 +45,67 @@ class DescoClient:
                         page.fill("input[placeholder*='Meter'], input[name*='meter'], input[id*='meter']", self.meter_no)
                     
                     logger.info("Submitting inquiry...")
-                    # Try clicking multiple common search/submit patterns
                     submit_button = page.locator("button:has-text('Search'), button:has-text('Submit'), button:has-text('Inquiry'), button[type='submit'], .btn-primary, .btn-search").first
                     
                     if submit_button.is_visible():
                         submit_button.click()
                     else:
-                        logger.warning("Submit button not found by text, trying to press Enter on input field...")
-                        # Fallback: Press Enter on the last filled input field
+                        logger.warning("Submit button not found by text, trying to press Enter...")
                         page.keyboard.press("Enter")
                 else:
                     logger.info(f"Password provided. Navigating to main login: {self.MAIN_URL}")
                     page.goto(self.MAIN_URL, timeout=60000)
-                    
                     page.fill("input[name='userid'], input[name='username'], input[id='userid']", self.username)
                     page.fill("input[name='password'], input[id='password']", self.password)
-                    
                     logger.info("Attempting login...")
                     page.click("button[type='submit'], input[type='submit']")
                 
-                # Wait for results - SPAs often take time to fetch data after button click
-                page.wait_for_load_state("networkidle")
-                # Wait a bit longer for the specific balance text to likely appear
-                page.wait_for_timeout(3000) 
+                # Patient wait logic for SPA loading
+                logger.info("Waiting for results to populate...")
+                page.wait_for_load_state("networkidle", timeout=30000)
                 
-                # Extract balance
-                # Usually balance is in a div or span with 'balance' in text or id
-                balance_selector = ".balance-amount, #balance, :text('Balance')"
-                balance_text = ""
-                
-                # Try to find balance specifically
-                try:
-                    # Look for elements containing "BDT" or numeric values near "Balance"
-                    balance_element = page.locator("text=/Balance|Current Balance/i").first
-                    if balance_element:
-                        # Find the nearest numeric value
-                        parent = balance_element.locator("xpath=..")
-                        balance_text = parent.inner_text()
-                except:
-                    logger.warning("Could not find balance with text locator, trying generic extraction")
-                
-                # Fallback: Extract from whole page if specific selector fails
-                if not balance_text:
-                    balance_text = page.content()
-
-                # Parse balance (simple regex approach in main or here)
-                # For now, return the raw text or found value
+                import time
                 import re
-                match = re.search(r"(\d+\.?\d*)\s*(?:BDT|Tk|TK)", balance_text)
-                balance = float(match.group(1)) if match else None
-                
-                meter_match = re.search(r"Meter\s*(?:No|Number)?\s*:?\s*(\d+)", balance_text, re.I)
-                meter_no = meter_match.group(1) if meter_match else Config.METER_NUMBER
-
                 from datetime import datetime
+                
+                balance = None
+                meter_no = Config.METER_NUMBER
+                start_time = time.time()
+                while time.time() - start_time < 20:
+                    balance_text = page.inner_text("body")
+                    
+                    # Regex patterns for balance: "Balance: 1,234.56" or "1,234 BDT"
+                    patterns = [
+                        r"(?:Balance|Current|Available|Amount)[^\d]*([\d,]+\.?\d*)",
+                        r"([\d,]+\.?\d*)\s*(?:BDT|Tk|TK|Taka)"
+                    ]
+                    
+                    found_val = None
+                    for pattern in patterns:
+                        for match in re.finditer(pattern, balance_text, re.I):
+                            try:
+                                val = float(match.group(1).replace(',', ''))
+                                # Heuristic: Prioritize non-zero values during async loading
+                                if found_val is None or val > 0:
+                                    found_val = val
+                            except: continue
+                    
+                    if found_val is not None and found_val > 0:
+                        balance = found_val
+                        meter_match = re.search(r"Meter\s*(?:No|Number)?\s*:?\s*(\d+)", balance_text, re.I)
+                        if meter_match: meter_no = meter_match.group(1)
+                        logger.info(f"Detected valid balance: {balance}")
+                        break
+                    
+                    time.sleep(3)
+                
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                 if balance is not None:
                     logger.info(f"Successfully fetched balance: {balance} BDT")
                     return balance, meter_no, timestamp
                 else:
-                    logger.error("Failed to extract balance numeric value from page")
-                    # Save a screenshot for debugging if it fails
+                    logger.error("Failed to extract balance numeric value after waiting 20s.")
                     page.screenshot(path="logs/error_screenshot.png")
                     return None
 

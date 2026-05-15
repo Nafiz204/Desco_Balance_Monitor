@@ -36,6 +36,14 @@ jobs:
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
         run: python main.py
 
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitor-logs
+          path: logs/
+          retention-days: 7
+
       - name: Commit and push status
         run: |
           git config --local user.email "action@github.com"
