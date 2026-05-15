@@ -74,27 +74,53 @@ class DescoClient:
                 while time.time() - start_time < 20:
                     balance_text = page.inner_text("body")
                     
-                    # Regex patterns for balance: "Balance: 1,234.56" or "1,234 BDT"
+                    # Store debug content
+                    with open("logs/page_content_debug.txt", "w") as f:
+                        f.write(balance_text)
+                    
+                    # More specific patterns based on the user's HTML snippet
                     patterns = [
-                        r"(?:Balance|Current|Available|Amount)[^\d]*([\d,]+\.?\d*)",
-                        r"([\d,]+\.?\d*)\s*(?:BDT|Tk|TK|Taka)"
+                        r"Remaining Balance\s*:\s*([\d,]+\.?\d*)",
+                        r"(?:Current Balance|Available Balance|Net Balance)[^\d\n]{0,30}([\d,]+\.?\d*)",
+                        r"Balance[^\d\n]{0,30}([\d,]+\.?\d*)"
                     ]
                     
                     found_val = None
                     for pattern in patterns:
-                        for match in re.finditer(pattern, balance_text, re.I):
+                        match = re.search(pattern, balance_text, re.I)
+                        if match:
                             try:
-                                val = float(match.group(1).replace(',', ''))
-                                # Heuristic: Prioritize non-zero values during async loading
-                                if found_val is None or val > 0:
+                                val_str = match.group(1).replace(',', '')
+                                val = float(val_str)
+                                
+                                # Safeguard: Ensure this isn't just the meter number or account number
+                                # Meter numbers and account numbers are usually integers or long strings
+                                if str(int(val)) == self.username or str(int(val)) == self.meter_no:
+                                    logger.warning(f"Detected value {val} matches ID ({self.username}/{self.meter_no}). Skipping as balance.")
+                                    continue
+                                    
+                                if val > 0:
                                     found_val = val
+                                    logger.info(f"Matched pattern '{pattern}' with value: {val}")
+                                    break 
                             except: continue
                     
-                    if found_val is not None and found_val > 0:
+                    # Fallback to loose BDT pattern if nothing specific found
+                    if found_val is None:
+                        bdt_match = re.search(r"([\d,]+\.?\d*)\s*(?:BDT|Tk|TK|Taka)", balance_text, re.I)
+                        if bdt_match:
+                            try:
+                                val = float(bdt_match.group(1).replace(',', ''))
+                                if val > 0 and str(int(val)) != self.username and str(int(val)) != self.meter_no:
+                                    found_val = val
+                                    logger.info(f"Fallback to BDT pattern: {val}")
+                            except: pass
+                    
+                    if found_val is not None:
                         balance = found_val
                         meter_match = re.search(r"Meter\s*(?:No|Number)?\s*:?\s*(\d+)", balance_text, re.I)
                         if meter_match: meter_no = meter_match.group(1)
-                        logger.info(f"Detected valid balance: {balance}")
+                        logger.info(f"Detected valid balance candidate: {balance}")
                         break
                     
                     time.sleep(3)
