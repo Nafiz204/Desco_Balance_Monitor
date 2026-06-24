@@ -1,9 +1,9 @@
 {
     "last_check_status": "failed",
     "last_check_time": "2026-06-21 05:51:24",
-    "last_alert_threshold": 500,
+    "last_alert_threshold": null,
     "last_alert_time": "2026-06-22 06:15:28",
-    "balance": 209.27,
+    "balance": 1038.18,
     "meter_no": "661120146954",
-    "last_check": "2026-06-23 04:52:56"
+    "last_check": "2026-06-24 04:56:51"
 }
